@@ -1,9 +1,9 @@
 
 ## 👤 Owner
 
-- **Name**: Trần Công Tuấn Anh  
-- **GitHub**: [@heavenknows1978](https://github.com/heavenknows1978)  
-- **Repo**: [hass-deyecloud](https://github.com/heavenknows1978/hass-deyecloud)  
+- **Name**: Filip Jabłoński
+- **GitHub**: [@filipsworks](https://github.com/filipsworks)
+- **Repo**: [hass-deyecloud](https://github.com/filipsworks/hass-deyecloud)
 - **License**: MIT
 
 # 🌞 Deye Cloud Home Assistant Integration

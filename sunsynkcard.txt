@@ -34,6 +34,13 @@ entities:
   day_grid_export_77: sensor.dailygridfeedin_your_inverter_serialnumber
   grid_ct_power_172: sensor.externalctpowerl1l2_your_inverter_serialnumber
   day_load_energy_84: sensor.dailyconsumption_your_inverter_serialnumber
+  day_pv_energy_108: sensor.dailyactiveproduction_your_inverter_serialnumber
+  pv1_power_186: sensor.dcpowerpv1_your_inverter_serialnumber
+  pv2_power_187: sensor.dcpowerpv2_your_inverter_serialnumber
+  pv1_voltage_109: sensor.dcvoltagepv1_your_inverter_serialnumber
+  pv1_current_110: sensor.dccurrentpv1_your_inverter_serialnumber
+  pv2_voltage_111: sensor.dcvoltagepv2_your_inverter_serialnumber
+  pv2_current_112: sensor.dccurrentpv2_your_inverter_serialnumber
   essential_power: none
   nonessential_power: none
   aux_power_166: sensor.sunsynk_aux_power
