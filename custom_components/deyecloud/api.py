@@ -37,3 +37,21 @@ async def async_control_solar_sell(session: aiohttp.ClientSession, token, base_u
     async with session.post(url, json=payload, headers=headers, timeout=10) as resp:
         resp.raise_for_status()
         return await resp.json()
+
+async def async_control_system_work_mode(session: aiohttp.ClientSession, token, base_url, device_sn, work_mode):
+    """Send system work mode control command."""
+    url = f"{base_url}/order/sys/workMode/control"
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "deviceSn": device_sn,
+        "workMode": work_mode
+    }
+    
+    async with session.post(url, json=payload, headers=headers, timeout=10) as resp:
+        resp.raise_for_status()
+        return await resp.json()
