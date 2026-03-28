@@ -55,3 +55,20 @@ async def async_control_system_work_mode(session: aiohttp.ClientSession, token, 
     async with session.post(url, json=payload, headers=headers, timeout=10) as resp:
         resp.raise_for_status()
         return await resp.json()
+
+async def async_get_system_config(session: aiohttp.ClientSession, token, base_url, device_sn):
+    """Get current system configuration including work mode."""
+    url = f"{base_url}/config/system"
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "deviceSn": device_sn
+    }
+    
+    async with session.post(url, json=payload, headers=headers, timeout=10) as resp:
+        resp.raise_for_status()
+        return await resp.json()
