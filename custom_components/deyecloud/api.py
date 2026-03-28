@@ -40,7 +40,7 @@ async def async_control_solar_sell(session: aiohttp.ClientSession, token, base_u
 
 async def async_control_system_work_mode(session: aiohttp.ClientSession, token, base_url, device_sn, work_mode):
     """Send system work mode control command."""
-    url = f"{base_url}/order/sys/workMode/control"
+    url = f"{base_url}/order/sys/workMode/update"
     
     headers = {
         "Authorization": f"Bearer {token}",
