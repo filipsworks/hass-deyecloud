@@ -7,7 +7,7 @@ CONF_APP_SECRET = "app_secret"
 CONF_BASE_URL = "base_url"
 CONF_START_MONTH = "start_month"
 
-# Define work mode constants
+# Work Mode Constants
 WORK_MODE_SELLING_FIRST = "SELLING_FIRST"
 WORK_MODE_ZERO_EXPORT_TO_LOAD = "ZERO_EXPORT_TO_LOAD"
 WORK_MODE_ZERO_EXPORT_TO_CT = "ZERO_EXPORT_TO_CT"
