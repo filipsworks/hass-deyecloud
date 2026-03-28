@@ -13,9 +13,8 @@ from .const import (
     CONF_APP_SECRET,
     CONF_BASE_URL,
     WORK_MODES,
-    WORK_MODE_SELLING_FIRST,
 )
-from .api import async_get_token, async_control_system_work_mode
+from .api import async_get_token, async_control_system_work_mode, async_get_system_config
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,12 +79,11 @@ class DeyeWorkModeSelect(SelectEntity):
         self._app_secret = app_secret
         self._base_url = base_url
         self._device_sn = device_sn
-        self._current_option = WORK_MODE_SELLING_FIRST
+        self._current_option = None
         
         self._attr_name = f"Deye Work Mode"
         self._attr_unique_id = f"{device_sn}_work_mode_select"
         self._attr_options = list(WORK_MODES.values())
-        self._attr_current_option = WORK_MODES[self._current_option]
 
     @property
     def device_info(self):
@@ -95,6 +93,39 @@ class DeyeWorkModeSelect(SelectEntity):
             "manufacturer": "Deye",
             "model": "Inverter",
         }
+    
+    @property
+    def current_option(self) -> str | None:
+        """Return the current option."""
+        return self._current_option
+    
+    async def async_update(self) -> None:
+        """Update the current work mode from API."""
+        session = async_get_clientsession(self.hass)
+        try:
+            token = await async_get_token(
+                session, 
+                self._username, 
+                self._password, 
+                self._app_id, 
+                self._app_secret, 
+                self._base_url
+            )
+            
+            config_data = await async_get_system_config(
+                session,
+                token,
+                self._base_url,
+                self._device_sn
+            )
+            
+            # Extract work mode from response
+            work_mode = config_data.get("workMode")
+            if work_mode and work_mode in WORK_MODES:
+                self._current_option = WORK_MODES[work_mode]
+            
+        except Exception as e:
+            _LOGGER.error(f"Failed to update work mode: {e}")
     
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
@@ -120,8 +151,8 @@ class DeyeWorkModeSelect(SelectEntity):
                 work_mode_value
             )
             
-            self._current_option = work_mode_value
-            self._attr_current_option = option
+            self._current_option = option
+            self.async_write_ha_state()
             
         except Exception as e:
             _LOGGER.error(f"Failed to set work mode: {e}")
