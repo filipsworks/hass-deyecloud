@@ -4,7 +4,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
+from homeassistant.exceptions import HomeAssistantError
 from .const import (
     DOMAIN,
     CONF_USERNAME,
@@ -14,7 +14,7 @@ from .const import (
     CONF_BASE_URL,
     WORK_MODES,
 )
-from .api import async_get_token, async_control_system_work_mode, async_get_system_config
+from .api import async_get_token, async_control_system_work_mode, async_get_system_config, DeyeCloudAPIError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -126,6 +126,7 @@ class DeyeWorkModeSelect(SelectEntity):
             
         except Exception as e:
             _LOGGER.error(f"Failed to update work mode: {e}")
+            # Don't raise here - just log. Update failures shouldn't break the entity
     
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
@@ -154,5 +155,9 @@ class DeyeWorkModeSelect(SelectEntity):
             self._current_option = option
             self.async_write_ha_state()
             
+        except DeyeCloudAPIError as e:
+            _LOGGER.error(f"Failed to set work mode for {self._device_sn}: {e}")
+            raise HomeAssistantError(f"Failed to set work mode: {e}") from e
         except Exception as e:
-            _LOGGER.error(f"Failed to set work mode: {e}")
+            _LOGGER.error(f"Unexpected error setting work mode: {e}")
+            raise HomeAssistantError(f"Unexpected error setting work mode: {e}") from e
