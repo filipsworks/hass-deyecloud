@@ -5,7 +5,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
+from homeassistant.exceptions import HomeAssistantError
 from .const import (
     DOMAIN,
     CONF_USERNAME,
@@ -14,7 +14,7 @@ from .const import (
     CONF_APP_SECRET,
     CONF_BASE_URL
 )
-from .api import async_get_token, async_control_solar_sell
+from .api import async_get_token, async_control_solar_sell, DeyeCloudAPIError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -117,5 +117,9 @@ class DeyeSolarSellButton(ButtonEntity):
                 self._device_sn, 
                 self._is_enable
             )
-        except Exception as e:
+        except DeyeCloudAPIError as e:
             _LOGGER.error(f"Failed to press button {self.name}: {e}")
+            raise HomeAssistantError(f"Failed to control solar sell for {self._device_sn}: {e}") from e
+        except Exception as e:
+            _LOGGER.error(f"Unexpected error pressing button {self.name}: {e}")
+            raise HomeAssistantError(f"Unexpected error controlling solar sell: {e}") from e
