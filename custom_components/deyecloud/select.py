@@ -98,6 +98,11 @@ class DeyeWorkModeSelect(SelectEntity):
     def current_option(self) -> str | None:
         """Return the current option."""
         return self._current_option
+
+    async def async_added_to_hass(self) -> None:
+        """Called when entity is added to Home Assistant."""
+        # Fetch work mode immediately on startup
+        await self.async_update()
     
     async def async_update(self) -> None:
         """Update the current work mode from API."""
