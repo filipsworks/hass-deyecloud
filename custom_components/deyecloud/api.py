@@ -1,5 +1,14 @@
 import hashlib
 import aiohttp
+from homeassistant.exceptions import HomeAssistantError
+
+class DeyeCloudAPIError(HomeAssistantError):
+    """Base exception for Deye Cloud API errors."""
+    pass
+
+class DeyeCloudAuthError(DeyeCloudAPIError):
+    """Exception raised for authentication failures."""
+    pass
 
 def _sha256(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest().lower()
@@ -15,7 +24,7 @@ async def async_get_token(session: aiohttp.ClientSession, username, password, ap
         resp.raise_for_status()
         j = await resp.json()
         if not j.get("success"):
-            raise Exception(f"Token request failed: {j.get('msg')}")
+            raise DeyeCloudAuthError(f"Token request failed: {j.get('msg')}")
         return j["accessToken"]
 
 async def async_control_solar_sell(session: aiohttp.ClientSession, token, base_url, device_sn, is_enable):
@@ -36,7 +45,10 @@ async def async_control_solar_sell(session: aiohttp.ClientSession, token, base_u
     
     async with session.post(url, json=payload, headers=headers, timeout=10) as resp:
         resp.raise_for_status()
-        return await resp.json()
+        j = await resp.json()
+        if not j.get("success"):
+            raise DeyeCloudAPIError(f"Solar sell control failed: {j.get('msg')}")
+        return j
 
 async def async_control_system_work_mode(session: aiohttp.ClientSession, token, base_url, device_sn, work_mode):
     """Send system work mode control command."""
@@ -54,7 +66,10 @@ async def async_control_system_work_mode(session: aiohttp.ClientSession, token, 
     
     async with session.post(url, json=payload, headers=headers, timeout=10) as resp:
         resp.raise_for_status()
-        return await resp.json()
+        j = await resp.json()
+        if not j.get("success"):
+            raise DeyeCloudAPIError(f"Work mode control failed: {j.get('msg')}")
+        return j
 
 async def async_get_system_config(session: aiohttp.ClientSession, token, base_url, device_sn):
     """Get current system configuration including work mode."""
@@ -71,4 +86,7 @@ async def async_get_system_config(session: aiohttp.ClientSession, token, base_ur
     
     async with session.post(url, json=payload, headers=headers, timeout=10) as resp:
         resp.raise_for_status()
-        return await resp.json()
+        j = await resp.json()
+        if not j.get("success"):
+            raise DeyeCloudAPIError(f"System config request failed: {j.get('msg')}")
+        return j
