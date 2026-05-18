@@ -286,9 +286,10 @@ class DeyeTouNumber(NumberEntity):
             self.async_write_ha_state()
         except Exception as e:
             _LOGGER.error("Failed to set %s to %.1f: %s", self.unique_id, value, e)
+            dump = getattr(e, "dump", None)
             async_create(
                 self.hass,
-                str(e),
+                f"{e}\n\n{dump}" if dump else str(e),
                 title="Deye TOU Update Error",
                 notification_id=f"tou_error_{self._device_sn}_{self._program_num}_{self._api_key}",
             )

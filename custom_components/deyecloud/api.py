@@ -1,9 +1,18 @@
 import hashlib
+import json
 import logging
 
 import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class TouUpdateError(Exception):
+    """Carries the full request/response dump for notifications."""
+
+    def __init__(self, message: str, dump: str):
+        super().__init__(message)
+        self.dump = dump
 
 
 def _sha256(password: str) -> str:
@@ -144,15 +153,29 @@ async def async_update_tou(
         "timeUseSettingItems": time_use_setting_items,
     }
 
+    safe_headers = {**headers, "Authorization": "Bearer <redacted>"}
     async with session.post(url, json=payload, headers=headers, timeout=10) as resp:
         body = await resp.text()
-        _LOGGER.warning("TOU update HTTP %s — request=%s response=%s", resp.status, payload, body)
+        dump = (
+            f"POST {url}\n"
+            f"Headers: {json.dumps(safe_headers, indent=2)}\n"
+            f"Body: {json.dumps(payload, indent=2)}\n"
+            f"\n--- Response ---\n"
+            f"HTTP {resp.status}\n"
+            f"{body}"
+        )
+        _LOGGER.warning("TOU update:\n%s", dump)
         if resp.status >= 400:
-            resp.raise_for_status()
-        import json as _json
-        data = _json.loads(body)
+            raise TouUpdateError(
+                f"TOU update HTTP {resp.status}: {body or '(empty body)'}", dump
+            )
+        try:
+            data = json.loads(body) if body else {}
+        except ValueError:
+            raise TouUpdateError(f"TOU update returned non-JSON body", dump)
         if isinstance(data, dict) and data.get("success") is False:
-            raise Exception(
-                f"TOU update rejected: code={data.get('code')} msg={data.get('msg')}"
+            raise TouUpdateError(
+                f"TOU update rejected: code={data.get('code')} msg={data.get('msg')}",
+                dump,
             )
         return data

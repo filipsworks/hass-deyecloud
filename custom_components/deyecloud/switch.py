@@ -261,9 +261,10 @@ class DeyeTouGridChargeSwitch(SwitchEntity):
             self.async_write_ha_state()
         except Exception as e:
             _LOGGER.error("Failed to set %s: %s", self.unique_id, e)
+            dump = getattr(e, "dump", None)
             async_create(
                 self.hass,
-                str(e),
+                f"{e}\n\n{dump}" if dump else str(e),
                 title="Deye TOU Update Error",
                 notification_id=f"tou_error_{self._device_sn}_{self._program_num}_grid",
             )
@@ -385,9 +386,10 @@ class DeyeTouGenerationChargeSwitch(SwitchEntity):
             self.async_write_ha_state()
         except Exception as e:
             _LOGGER.error("Failed to set %s: %s", self.unique_id, e)
+            dump = getattr(e, "dump", None)
             async_create(
                 self.hass,
-                str(e),
+                f"{e}\n\n{dump}" if dump else str(e),
                 title="Deye TOU Update Error",
                 notification_id=f"tou_error_{self._device_sn}_{self._program_num}_gen",
             )
