@@ -3,17 +3,21 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 
-PLATFORMS = ["sensor", "button", "select"]
+PLATFORMS = ["sensor", "button", "select", "number", "time"]
+
 
 async def async_setup(hass: HomeAssistant, config: dict):
     return True
 
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)  
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     return await hass.config_entries.async_forward_entry_unload(entry, PLATFORMS)
+
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload the DeyeCloud config entry."""
