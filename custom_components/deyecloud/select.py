@@ -116,6 +116,28 @@ async def async_setup_entry(
 
 
 # ===================================================================
+# Helpers
+# ===================================================================
+
+
+async def _async_station_list(session, token, base_url):
+    url = f"{base_url}/station/list"
+    headers = {"Authorization": f"Bearer {token}"}
+    async with session.post(url, headers=headers, json={}, timeout=10) as resp:
+        resp.raise_for_status()
+        return (await resp.json()).get("stationList", [])
+
+
+async def _async_device_list(session, token, base_url, station_ids):
+    url = f"{base_url}/station/device"
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {"page": 1, "size": 20, "stationIds": station_ids}
+    async with session.post(url, headers=headers, json=payload, timeout=10) as resp:
+        resp.raise_for_status()
+        return (await resp.json()).get("deviceListItems", [])
+
+
+# ===================================================================
 # Work Mode Select (existing)
 # ===================================================================
 
