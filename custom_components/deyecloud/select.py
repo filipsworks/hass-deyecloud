@@ -63,6 +63,24 @@ async def async_setup_entry(
                 if device.get("deviceType") == "INVERTER":
                     sn = device["deviceSn"]
 
+                    # Fetch work mode during setup so it's not "unknown"
+                    try:
+                        token_for_config = await async_get_token(
+                            session, username, password, app_id, app_secret, base_url
+                        )
+                        config_data = await async_get_system_config(
+                            session, token_for_config, base_url, sn
+                        )
+                        work_mode = config_data.get("workMode")
+                        initial_work_mode = (
+                            WORK_MODES[work_mode]
+                            if work_mode and work_mode in WORK_MODES
+                            else None
+                        )
+                    except Exception:
+                        _LOGGER.warning("Failed to fetch initial work mode for %s", sn)
+                        initial_work_mode = None
+
                     # Work mode select
                     entities.append(
                         DeyeWorkModeSelect(
@@ -73,6 +91,7 @@ async def async_setup_entry(
                             app_secret,
                             base_url,
                             sn,
+                            initial_work_mode,
                         )
                     )
 
@@ -141,7 +160,15 @@ async def async_setup_entry(
 
 class DeyeWorkModeSelect(SelectEntity):
     def __init__(
-        self, hass, username, password, app_id, app_secret, base_url, device_sn
+        self,
+        hass,
+        username,
+        password,
+        app_id,
+        app_secret,
+        base_url,
+        device_sn,
+        initial_option=None,
     ):
         self.hass = hass
         self._username = username
@@ -150,7 +177,7 @@ class DeyeWorkModeSelect(SelectEntity):
         self._app_secret = app_secret
         self._base_url = base_url
         self._device_sn = device_sn
-        self._current_option = None
+        self._current_option = initial_option
 
         self._attr_name = f"Deye Work Mode"
         self._attr_unique_id = f"{device_sn}_work_mode_select"
