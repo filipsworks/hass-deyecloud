@@ -49,53 +49,29 @@ def _seconds_to_api_time(seconds: int) -> str:
     return f"{h:02d}:{m:02d}"
 
 
-def _build_tou_payload(hass, device_sn, program_num, api_key, new_value):
-    """Read all TOU entity states from HA and build a complete 6-slot payload."""
-    items = []
-    for i in range(1, 7):
-        time_state = hass.states.get(f"{device_sn}_program_{i}_time")
-        power_state = hass.states.get(f"{device_sn}_program_{i}_power")
-        soc_state = hass.states.get(f"{device_sn}_program_{i}_soc")
-        grid_state = hass.states.get(f"{device_sn}_program_{i}_grid_charge")
-        gen_state = hass.states.get(f"{device_sn}_program_{i}_generation_charge")
+async def _build_tou_payload_async(
+    session, token, base_url, device_sn, program_num, api_key, new_value
+):
+    """Fetch all TOU items from API, overlay the changed field, pad to 6 slots."""
+    tou_data = await async_get_tou(session, token, base_url, device_sn)
+    items = tou_data.get("timeUseSettingItems", [])
 
-        if time_state is not None and time_state.state:
-            secs = _api_time_to_seconds(time_state.state)
-            api_time = _seconds_to_api_time(secs) if secs else "00:00"
-        else:
-            api_time = "00:00"
-
-        # Read power/soc from HA states, override the changed field
-        power_val = (
-            power_state.native_value
-            if power_state is not None and power_state.state is not None
-            else 15000
-        )
-        soc_val = (
-            soc_state.native_value
-            if soc_state is not None and soc_state.state is not None
-            else 20
-        )
-
-        # Apply the new value to the correct field on this program slot
-        if i == program_num:
-            if api_key == "power":
-                power_val = new_value
-            elif api_key == "soc":
-                soc_val = new_value
-
+    # Pad missing slots with defaults so we always send 6
+    while len(items) < 6:
         items.append(
             {
-                "power": power_val,
+                "power": 15000,
                 "voltage": 49,
-                "time": api_time,
-                "enableGridCharge": grid_state.is_on
-                if grid_state is not None
-                else False,
-                "enableGeneration": gen_state.is_on if gen_state is not None else False,
-                "soc": soc_val,
+                "time": "00:00",
+                "enableGridCharge": False,
+                "enableGeneration": False,
+                "soc": 20,
             }
         )
+
+    idx = program_num - 1
+    items[idx][api_key] = new_value
+
     return items
 
 
@@ -254,7 +230,7 @@ class DeyeTouNumber(NumberEntity):
             _LOGGER.error("Failed to update %s: %s", self.unique_id, e)
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set new value via API — build full payload from all HA entity states."""
+        """Set new value via API — fetch all from API, overlay changed field."""
         session = async_get_clientsession(self.hass)
         try:
             token = await async_get_token(
@@ -266,8 +242,14 @@ class DeyeTouNumber(NumberEntity):
                 self._base_url,
             )
 
-            items = _build_tou_payload(
-                self.hass, self._device_sn, self._program_num, self._api_key, value
+            items = await _build_tou_payload_async(
+                session,
+                token,
+                self._base_url,
+                self._device_sn,
+                self._program_num,
+                self._api_key,
+                value,
             )
 
             payload = {"deviceSn": self._device_sn, "timeUseSettingItems": items}

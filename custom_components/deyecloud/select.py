@@ -52,47 +52,30 @@ def _seconds_to_api_time(seconds: int) -> str:
     return f"{h:02d}:{m:02d}"
 
 
-def _build_tou_payload(hass, device_sn, program_num, grid_charge, gen_charge):
-    """Read all TOU entity states from HA and build a complete 6-slot payload."""
-    items = []
-    for i in range(1, 7):
-        time_state = hass.states.get(f"{device_sn}_program_{i}_time")
-        power_state = hass.states.get(f"{device_sn}_program_{i}_power")
-        soc_state = hass.states.get(f"{device_sn}_program_{i}_soc")
-        grid_state = hass.states.get(f"{device_sn}_program_{i}_grid_charge")
-        gen_state = hass.states.get(f"{device_sn}_program_{i}_generation_charge")
+async def _build_tou_payload_async(
+    session, token, base_url, device_sn, program_num, grid_charge, gen_charge
+):
+    """Fetch all TOU items from API, overlay the changed charge flags, pad to 6 slots."""
+    tou_data = await async_get_tou(session, token, base_url, device_sn)
+    items = tou_data.get("timeUseSettingItems", [])
 
-        if time_state is not None and time_state.state:
-            secs = _api_time_to_seconds(time_state.state)
-            api_time = _seconds_to_api_time(secs) if secs else "00:00"
-        else:
-            api_time = "00:00"
-
-        power_val = (
-            power_state.native_value
-            if power_state is not None and power_state.state is not None
-            else 15000
-        )
-        soc_val = (
-            soc_state.native_value
-            if soc_state is not None and soc_state.state is not None
-            else 20
-        )
-
+    # Pad missing slots with defaults so we always send 6
+    while len(items) < 6:
         items.append(
             {
-                "power": power_val,
+                "power": 15000,
                 "voltage": 49,
-                "time": api_time,
-                "enableGridCharge": grid_charge
-                if i == program_num
-                else (grid_state.is_on if grid_state is not None else False),
-                "enableGeneration": gen_charge
-                if i == program_num
-                else (gen_state.is_on if gen_state is not None else False),
-                "soc": soc_val,
+                "time": "00:00",
+                "enableGridCharge": False,
+                "enableGeneration": False,
+                "soc": 20,
             }
         )
+
+    idx = program_num - 1
+    items[idx]["enableGridCharge"] = grid_charge
+    items[idx]["enableGeneration"] = gen_charge
+
     return items
 
 
@@ -489,8 +472,14 @@ class DeyeTouGridChargeSwitch(SwitchEntity):
                 self._base_url,
             )
 
-            items = _build_tou_payload(
-                self.hass, self._device_sn, self._program_num, grid_charge, gen_charge
+            items = await _build_tou_payload_async(
+                session,
+                token,
+                self._base_url,
+                self._device_sn,
+                self._program_num,
+                grid_charge,
+                gen_charge,
             )
 
             payload = {"deviceSn": self._device_sn, "timeUseSettingItems": items}
@@ -597,8 +586,14 @@ class DeyeTouGenerationChargeSwitch(SwitchEntity):
                 self._base_url,
             )
 
-            items = _build_tou_payload(
-                self.hass, self._device_sn, self._program_num, grid_charge, gen_charge
+            items = await _build_tou_payload_async(
+                session,
+                token,
+                self._base_url,
+                self._device_sn,
+                self._program_num,
+                grid_charge,
+                gen_charge,
             )
 
             payload = {"deviceSn": self._device_sn, "timeUseSettingItems": items}
