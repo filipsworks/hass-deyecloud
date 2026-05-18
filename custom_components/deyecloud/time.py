@@ -45,6 +45,16 @@ def _seconds_to_api_time(seconds: int) -> str:
     return f"{h:02d}:{m:02d}"
 
 
+def _normalize_api_time(api_time: str) -> str:
+    """Normalize any time string to 'HH:MM' format."""
+    if not api_time:
+        return "00:00"
+    t = api_time.replace(":", "")
+    if len(t) >= 4:
+        return f"{t[0:2]}:{t[2:4]}"
+    return api_time
+
+
 async def _build_tou_payload_async(
     session, token, base_url, device_sn, program_num, new_time_seconds
 ):
@@ -68,6 +78,10 @@ async def _build_tou_payload_async(
     idx = program_num - 1
     api_time = _seconds_to_api_time(new_time_seconds)
     items[idx]["time"] = api_time
+
+    # Normalize all time values to 'HH:MM' format
+    for item in items:
+        item["time"] = _normalize_api_time(item.get("time", ""))
 
     return items
 
