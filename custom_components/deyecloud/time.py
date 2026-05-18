@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from datetime import time
 
 from homeassistant.components.time import TimeEntity
 from homeassistant.config_entries import ConfigEntry
@@ -131,9 +131,12 @@ class DeyeTouTime(TimeEntity):
 
         self._attr_name = f"Program {program_num} Time"
         self._attr_unique_id = f"{device_sn}_program_{program_num}_time"
-        self._attr_native_value = (
-            timedelta(seconds=initial_value) if initial_value is not None else None
-        )
+        if initial_value is not None:
+            h, rem = divmod(initial_value, 3600)
+            m, s = divmod(rem, 60)
+            self._attr_native_value = time(hour=h, minute=m, second=s)
+        else:
+            self._attr_native_value = None
 
     @property
     def device_info(self):
@@ -164,13 +167,14 @@ class DeyeTouTime(TimeEntity):
             if idx < len(items):
                 api_time = items[idx].get("time", "00:00")
                 seconds = _api_time_to_seconds(api_time)
-                self._attr_native_value = (
-                    timedelta(seconds=seconds) if seconds is not None else None
-                )
+                if seconds is not None:
+                    h, rem = divmod(seconds, 3600)
+                    m, s = divmod(rem, 60)
+                    self._attr_native_value = time(hour=h, minute=m, second=s)
         except Exception as e:
             _LOGGER.error("Failed to update %s: %s", self.unique_id, e)
 
-    async def async_select_native_value(self, value: timedelta) -> None:
+    async def async_select_native_value(self, value: time) -> None:
         """Set new time via API."""
         session = async_get_clientsession(self.hass)
         try:
@@ -200,7 +204,7 @@ class DeyeTouTime(TimeEntity):
                     }
                 )
 
-            seconds = int(value.total_seconds())
+            seconds = value.hour * 3600 + value.minute * 60
             api_time = _seconds_to_api_time(seconds)
             items[self._program_num - 1]["time"] = api_time
 
