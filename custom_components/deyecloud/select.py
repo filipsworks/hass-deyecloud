@@ -1,4 +1,5 @@
 import logging
+import time as _time
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
@@ -166,6 +167,7 @@ class DeyeWorkModeSelect(SelectEntity):
         self._attr_name = f"Deye Work Mode"
         self._attr_unique_id = f"{device_sn}_work_mode_select"
         self._attr_options = list(WORK_MODES.values())
+        self._last_write: float = 0
 
     @property
     def device_info(self):
@@ -183,6 +185,8 @@ class DeyeWorkModeSelect(SelectEntity):
 
     async def async_update(self) -> None:
         """Update the current work mode from API."""
+        if _time.monotonic() - self._last_write < 30:
+            return
         session = async_get_clientsession(self.hass)
         try:
             token = await async_get_token(
@@ -224,6 +228,7 @@ class DeyeWorkModeSelect(SelectEntity):
                 session, token, self._base_url, self._device_sn, work_mode_value
             )
 
+            self._last_write = _time.monotonic()
             self._current_option = option
             self.async_write_ha_state()
 
@@ -264,6 +269,7 @@ class DeyeTouSwitch(SelectEntity):
         self._attr_unique_id = f"{device_sn}_time_of_use"
         self._attr_options = ["Off", "On"]
         self._current_option = "On" if initial_action == "on" else "Off"
+        self._last_write: float = 0
 
     @property
     def device_info(self):
@@ -279,6 +285,8 @@ class DeyeTouSwitch(SelectEntity):
         return self._current_option
 
     async def async_update(self) -> None:
+        if _time.monotonic() - self._last_write < 30:
+            return
         session = async_get_clientsession(self.hass)
         try:
             token = await async_get_token(
@@ -312,6 +320,7 @@ class DeyeTouSwitch(SelectEntity):
             await async_switch_tou(
                 session, token, self._base_url, self._device_sn, action
             )
+            self._last_write = _time.monotonic()
             self._current_option = option
             self.async_write_ha_state()
         except Exception as e:

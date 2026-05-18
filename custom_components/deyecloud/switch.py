@@ -1,5 +1,6 @@
 import json
 import logging
+import time as _time
 
 from homeassistant.components.persistent_notification import async_create
 from homeassistant.components.switch import SwitchEntity
@@ -178,6 +179,7 @@ class DeyeTouGridChargeSwitch(SwitchEntity):
         self._attr_name = f"Program {program_num} Grid Charge"
         self._attr_unique_id = f"{device_sn}_program_{program_num}_grid_charge"
         self._is_on = initial_value
+        self._last_write: float = 0
 
     @property
     def device_info(self):
@@ -193,6 +195,8 @@ class DeyeTouGridChargeSwitch(SwitchEntity):
         return self._is_on
 
     async def async_update(self) -> None:
+        if _time.monotonic() - self._last_write < 30:
+            return
         session = async_get_clientsession(self.hass)
         try:
             token = await async_get_token(
@@ -252,6 +256,7 @@ class DeyeTouGridChargeSwitch(SwitchEntity):
             await async_update_tou(
                 session, token, self._base_url, self._device_sn, items
             )
+            self._last_write = _time.monotonic()
             self._is_on = grid_charge
             self.async_write_ha_state()
         except Exception as e:
@@ -292,6 +297,7 @@ class DeyeTouGenerationChargeSwitch(SwitchEntity):
         self._attr_name = f"Program {program_num} Generation Charge"
         self._attr_unique_id = f"{device_sn}_program_{program_num}_generation_charge"
         self._is_on = initial_value
+        self._last_write: float = 0
 
     @property
     def device_info(self):
@@ -307,6 +313,8 @@ class DeyeTouGenerationChargeSwitch(SwitchEntity):
         return self._is_on
 
     async def async_update(self) -> None:
+        if _time.monotonic() - self._last_write < 30:
+            return
         session = async_get_clientsession(self.hass)
         try:
             token = await async_get_token(
@@ -366,6 +374,7 @@ class DeyeTouGenerationChargeSwitch(SwitchEntity):
             await async_update_tou(
                 session, token, self._base_url, self._device_sn, items
             )
+            self._last_write = _time.monotonic()
             self._is_on = gen_charge
             self.async_write_ha_state()
         except Exception as e:

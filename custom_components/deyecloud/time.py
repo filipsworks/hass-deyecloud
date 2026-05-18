@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time as _time
 from datetime import time
 
 from homeassistant.components.persistent_notification import async_create
@@ -180,6 +181,7 @@ class DeyeTouTime(TimeEntity):
             self._attr_native_value = time(hour=h, minute=m, second=s)
         else:
             self._attr_native_value = None
+        self._last_write: float = 0
 
     @property
     def device_info(self):
@@ -192,6 +194,8 @@ class DeyeTouTime(TimeEntity):
 
     async def async_update(self) -> None:
         """Fetch latest state from API."""
+        if _time.monotonic() - self._last_write < 30:
+            return
         session = async_get_clientsession(self.hass)
         try:
             token = await async_get_token(
@@ -260,6 +264,7 @@ class DeyeTouTime(TimeEntity):
             await async_update_tou(
                 session, token, self._base_url, self._device_sn, items
             )
+            self._last_write = _time.monotonic()
             self._attr_native_value = value
             self.async_write_ha_state()
         except Exception as e:
