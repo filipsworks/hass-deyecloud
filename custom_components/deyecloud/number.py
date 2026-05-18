@@ -145,6 +145,7 @@ class DeyeTouNumber(NumberEntity):
         self._attr_native_max_value = max_val
         self._attr_native_step = step
         self._attr_native_unit_of_measurement = unit
+        self._attr_mode = "box"
         self._attr_native_value = initial_value
 
     @property
