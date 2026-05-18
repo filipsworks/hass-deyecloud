@@ -267,7 +267,7 @@ class DeyeTouNumber(NumberEntity):
             )
 
             payload = {"deviceSn": self._device_sn, "timeUseSettingItems": items}
-            await async_create(
+            async_create(
                 self.hass,
                 json.dumps(payload, indent=2),
                 title="Deye TOU Update Payload",
