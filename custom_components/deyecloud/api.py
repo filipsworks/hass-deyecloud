@@ -1,6 +1,9 @@
 import hashlib
+import logging
 
 import aiohttp
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _sha256(password: str) -> str:
@@ -130,5 +133,10 @@ async def async_update_tou(
     payload = {"deviceSn": device_sn, "timeUseSettingItems": time_use_setting_items}
 
     async with session.post(url, json=payload, headers=headers, timeout=10) as resp:
-        resp.raise_for_status()
-        return await resp.json()
+        body = await resp.text()
+        if resp.status >= 400:
+            _LOGGER.error("TOU update failed: HTTP %s — %s", resp.status, body)
+            resp.raise_for_status()
+        _LOGGER.debug("TOU update response: %s", body)
+        import json as _json
+        return _json.loads(body)
