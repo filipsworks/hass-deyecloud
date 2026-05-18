@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import time
 
@@ -173,6 +174,15 @@ class DeyeTouTime(TimeEntity):
                     self._attr_native_value = time(hour=h, minute=m, second=s)
         except Exception as e:
             _LOGGER.error("Failed to update %s: %s", self.unique_id, e)
+
+    def set_value(self, value: time) -> None:
+        """Set new time via API (synchronous entry point for time.set_value service)."""
+        try:
+            asyncio.run_coroutine_threadsafe(
+                self.async_select_native_value(value), self.hass.loop
+            ).result()
+        except Exception as e:
+            _LOGGER.error("Failed to set %s: %s", self.unique_id, e)
 
     async def async_select_native_value(self, value: time) -> None:
         """Set new time via API."""
