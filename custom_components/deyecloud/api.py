@@ -130,13 +130,29 @@ async def async_update_tou(
 
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
-    payload = {"deviceSn": device_sn, "timeUseSettingItems": time_use_setting_items}
+    payload = {
+        "deviceSn": device_sn,
+        "days": [
+            "MONDAY",
+            "TUESDAY",
+            "WEDNESDAY",
+            "THURSDAY",
+            "FRIDAY",
+            "SATURDAY",
+            "SUNDAY",
+        ],
+        "timeUseSettingItems": time_use_setting_items,
+    }
 
     async with session.post(url, json=payload, headers=headers, timeout=10) as resp:
         body = await resp.text()
+        _LOGGER.warning("TOU update HTTP %s — request=%s response=%s", resp.status, payload, body)
         if resp.status >= 400:
-            _LOGGER.error("TOU update failed: HTTP %s — %s", resp.status, body)
             resp.raise_for_status()
-        _LOGGER.debug("TOU update response: %s", body)
         import json as _json
-        return _json.loads(body)
+        data = _json.loads(body)
+        if isinstance(data, dict) and data.get("success") is False:
+            raise Exception(
+                f"TOU update rejected: code={data.get('code')} msg={data.get('msg')}"
+            )
+        return data
