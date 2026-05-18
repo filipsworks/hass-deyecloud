@@ -1,6 +1,8 @@
+import json
 import logging
 
 from homeassistant.components.number import NumberEntity
+from homeassistant.components.persistent_notification import async_create
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -266,6 +268,14 @@ class DeyeTouNumber(NumberEntity):
 
             items = _build_tou_payload(
                 self.hass, self._device_sn, self._program_num, self._api_key, value
+            )
+
+            payload = {"deviceSn": self._device_sn, "timeUseSettingItems": items}
+            await async_create(
+                self.hass,
+                json.dumps(payload, indent=2),
+                title="Deye TOU Update Payload",
+                notification_id=f"tou_payload_{self._device_sn}_{self._program_num}",
             )
 
             await async_update_tou(

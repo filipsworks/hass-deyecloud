@@ -1,5 +1,7 @@
+import json
 import logging
 
+from homeassistant.components.persistent_notification import async_create
 from homeassistant.components.select import SelectEntity
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
@@ -491,6 +493,14 @@ class DeyeTouGridChargeSwitch(SwitchEntity):
                 self.hass, self._device_sn, self._program_num, grid_charge, gen_charge
             )
 
+            payload = {"deviceSn": self._device_sn, "timeUseSettingItems": items}
+            await async_create(
+                self.hass,
+                json.dumps(payload, indent=2),
+                title="Deye TOU Update Payload",
+                notification_id=f"tou_payload_{self._device_sn}_{self._program_num}_grid",
+            )
+
             await async_update_tou(
                 session, token, self._base_url, self._device_sn, items
             )
@@ -589,6 +599,14 @@ class DeyeTouGenerationChargeSwitch(SwitchEntity):
 
             items = _build_tou_payload(
                 self.hass, self._device_sn, self._program_num, grid_charge, gen_charge
+            )
+
+            payload = {"deviceSn": self._device_sn, "timeUseSettingItems": items}
+            await async_create(
+                self.hass,
+                json.dumps(payload, indent=2),
+                title="Deye TOU Update Payload",
+                notification_id=f"tou_payload_{self._device_sn}_{self._program_num}_gen",
             )
 
             await async_update_tou(

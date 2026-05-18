@@ -1,7 +1,9 @@
 import asyncio
+import json
 import logging
 from datetime import time
 
+from homeassistant.components.persistent_notification import async_create
 from homeassistant.components.time import TimeEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -236,6 +238,14 @@ class DeyeTouTime(TimeEntity):
             seconds = value.hour * 3600 + value.minute * 60
             items = _build_tou_payload(
                 self.hass, self._device_sn, self._program_num, seconds
+            )
+
+            payload = {"deviceSn": self._device_sn, "timeUseSettingItems": items}
+            await async_create(
+                self.hass,
+                json.dumps(payload, indent=2),
+                title="Deye TOU Update Payload",
+                notification_id=f"tou_payload_{self._device_sn}_{self._program_num}",
             )
 
             await async_update_tou(
