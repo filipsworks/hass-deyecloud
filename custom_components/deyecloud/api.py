@@ -141,15 +141,6 @@ async def async_update_tou(
 
     payload = {
         "deviceSn": device_sn,
-        "days": [
-            "MONDAY",
-            "TUESDAY",
-            "WEDNESDAY",
-            "THURSDAY",
-            "FRIDAY",
-            "SATURDAY",
-            "SUNDAY",
-        ],
         "timeUseSettingItems": time_use_setting_items,
     }
 
