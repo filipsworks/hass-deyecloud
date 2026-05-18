@@ -1,6 +1,7 @@
 import logging
 
 from homeassistant.components.select import SelectEntity
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -27,18 +28,12 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# ToU charging type options
-# ---------------------------------------------------------------------------
-TOU_CHARGING_OPTIONS = ["Off", "Grid Charge", "Generation Charge"]
-
-
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Setup work mode and ToU select entities."""
+    """Setup work mode and ToU select/switch entities."""
     config = entry.data
     username = config.get(CONF_USERNAME)
     password = config.get(CONF_PASSWORD)
@@ -81,7 +76,7 @@ async def async_setup_entry(
                         )
                     )
 
-                    # ToU switch
+                    # ToU main switch (on/off)
                     tou_data = await async_get_tou(session, token, base_url, sn)
                     tou_action = tou_data.get("touAction", "off")
                     entities.append(
@@ -97,15 +92,16 @@ async def async_setup_entry(
                         )
                     )
 
-                    # Per-program charging selects
+                    # Per-program grid charge and generation charge switches
                     items = tou_data.get("timeUseSettingItems", [])
                     for i in range(1, 7):
                         if i - 1 < len(items):
                             item = items[i - 1]
                         else:
                             item = {}
+
                         entities.append(
-                            DeyeTouChargingSelect(
+                            DeyeTouGridChargeSwitch(
                                 hass,
                                 username,
                                 password,
@@ -114,12 +110,26 @@ async def async_setup_entry(
                                 base_url,
                                 sn,
                                 i,
-                                item,
+                                item.get("enableGridCharge", False),
+                            )
+                        )
+
+                        entities.append(
+                            DeyeTouGenerationChargeSwitch(
+                                hass,
+                                username,
+                                password,
+                                app_id,
+                                app_secret,
+                                base_url,
+                                sn,
+                                i,
+                                item.get("enableGeneration", False),
                             )
                         )
 
     except Exception as e:
-        _LOGGER.error("Error setting up Deye selects: %s", e)
+        _LOGGER.error("Error setting up Deye selects/switches: %s", e)
 
     async_add_entities(entities)
 
@@ -211,7 +221,7 @@ class DeyeWorkModeSelect(SelectEntity):
 
 
 # ===================================================================
-# ToU Switch (on/off)
+# ToU Main Switch (on/off) — kept as Select for On/Off options
 # ===================================================================
 
 
@@ -298,12 +308,12 @@ class DeyeTouSwitch(SelectEntity):
 
 
 # ===================================================================
-# ToU Charging Type Select (per program slot)
+# Per-program Grid Charge Switch
 # ===================================================================
 
 
-class DeyeTouChargingSelect(SelectEntity):
-    """Per-program charging type select entity."""
+class DeyeTouGridChargeSwitch(SwitchEntity):
+    """Per-program enableGridCharge switch."""
 
     _attr_has_entity_name = True
 
@@ -317,7 +327,7 @@ class DeyeTouChargingSelect(SelectEntity):
         base_url,
         device_sn,
         program_num: int,
-        item: dict,
+        initial_value: bool,
     ):
         self.hass = hass
         self._username = username
@@ -328,19 +338,9 @@ class DeyeTouChargingSelect(SelectEntity):
         self._device_sn = device_sn
         self._program_num = program_num
 
-        self._attr_name = f"Program {program_num} Charging"
-        self._attr_unique_id = f"{device_sn}_program_{program_num}_charging"
-        self._attr_options = TOU_CHARGING_OPTIONS
-
-        # Derive initial option from API item
-        grid = item.get("enableGridCharge", False)
-        gen = item.get("enableGeneration", False)
-        if grid and not gen:
-            self._current_option = "Grid Charge"
-        elif gen and not grid:
-            self._current_option = "Generation Charge"
-        else:
-            self._current_option = "Off"
+        self._attr_name = f"Program {program_num} Grid Charge"
+        self._attr_unique_id = f"{device_sn}_program_{program_num}_grid_charge"
+        self._is_on = initial_value
 
     @property
     def device_info(self):
@@ -352,8 +352,8 @@ class DeyeTouChargingSelect(SelectEntity):
         }
 
     @property
-    def current_option(self) -> str | None:
-        return self._current_option
+    def is_on(self) -> bool | None:
+        return self._is_on
 
     async def async_update(self) -> None:
         session = async_get_clientsession(self.hass)
@@ -372,19 +372,17 @@ class DeyeTouChargingSelect(SelectEntity):
             items = tou_data.get("timeUseSettingItems", [])
             idx = self._program_num - 1
             if idx < len(items):
-                item = items[idx]
-                grid = item.get("enableGridCharge", False)
-                gen = item.get("enableGeneration", False)
-                if grid and not gen:
-                    self._current_option = "Grid Charge"
-                elif gen and not grid:
-                    self._current_option = "Generation Charge"
-                else:
-                    self._current_option = "Off"
+                self._is_on = items[idx].get("enableGridCharge", False)
         except Exception as e:
             _LOGGER.error("Failed to update %s: %s", self.unique_id, e)
 
-    async def async_select_option(self, option: str) -> None:
+    async def async_turn_on(self, **kwargs) -> None:
+        await self._set_charging(True, False)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self._set_charging(False, False)
+
+    async def _set_charging(self, grid_charge: bool, gen_charge: bool) -> None:
         session = async_get_clientsession(self.hass)
         try:
             token = await async_get_token(
@@ -396,41 +394,148 @@ class DeyeTouChargingSelect(SelectEntity):
                 self._base_url,
             )
 
-            # Read current ToU data to preserve other fields
             tou_data = await async_get_tou(
                 session, token, self._base_url, self._device_sn
             )
             items = tou_data.get("timeUseSettingItems", [])
 
-            # Ensure enough slots exist
             while len(items) < self._program_num:
                 items.append(
                     {
                         "power": 15000,
                         "voltage": 49,
-                        "time": "0000",
+                        "time": "00:00",
                         "enableGridCharge": False,
                         "enableGeneration": False,
                         "soc": 20,
                     }
                 )
 
-            # Set charging flags based on selected option
             idx = self._program_num - 1
-            if option == "Grid Charge":
-                items[idx]["enableGridCharge"] = True
-                items[idx]["enableGeneration"] = False
-            elif option == "Generation Charge":
-                items[idx]["enableGridCharge"] = False
-                items[idx]["enableGeneration"] = True
-            else:  # Off
-                items[idx]["enableGridCharge"] = False
-                items[idx]["enableGeneration"] = False
+            items[idx]["enableGridCharge"] = grid_charge
+            items[idx]["enableGeneration"] = gen_charge
 
             await async_update_tou(
                 session, token, self._base_url, self._device_sn, items
             )
-            self._current_option = option
+            self._is_on = grid_charge
+            self.async_write_ha_state()
+        except Exception as e:
+            _LOGGER.error("Failed to set %s: %s", self.unique_id, e)
+
+
+# ===================================================================
+# Per-program Generation Charge Switch
+# ===================================================================
+
+
+class DeyeTouGenerationChargeSwitch(SwitchEntity):
+    """Per-program enableGeneration switch."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        hass,
+        username,
+        password,
+        app_id,
+        app_secret,
+        base_url,
+        device_sn,
+        program_num: int,
+        initial_value: bool,
+    ):
+        self.hass = hass
+        self._username = username
+        self._password = password
+        self._app_id = app_id
+        self._app_secret = app_secret
+        self._base_url = base_url
+        self._device_sn = device_sn
+        self._program_num = program_num
+
+        self._attr_name = f"Program {program_num} Generation Charge"
+        self._attr_unique_id = f"{device_sn}_program_{program_num}_generation_charge"
+        self._is_on = initial_value
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._device_sn)},
+            "name": f"Deye Inverter {self._device_sn}",
+            "manufacturer": "Deye",
+            "model": "Inverter",
+        }
+
+    @property
+    def is_on(self) -> bool | None:
+        return self._is_on
+
+    async def async_update(self) -> None:
+        session = async_get_clientsession(self.hass)
+        try:
+            token = await async_get_token(
+                session,
+                self._username,
+                self._password,
+                self._app_id,
+                self._app_secret,
+                self._base_url,
+            )
+            tou_data = await async_get_tou(
+                session, token, self._base_url, self._device_sn
+            )
+            items = tou_data.get("timeUseSettingItems", [])
+            idx = self._program_num - 1
+            if idx < len(items):
+                self._is_on = items[idx].get("enableGeneration", False)
+        except Exception as e:
+            _LOGGER.error("Failed to update %s: %s", self.unique_id, e)
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await self._set_charging(False, True)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self._set_charging(False, False)
+
+    async def _set_charging(self, grid_charge: bool, gen_charge: bool) -> None:
+        session = async_get_clientsession(self.hass)
+        try:
+            token = await async_get_token(
+                session,
+                self._username,
+                self._password,
+                self._app_id,
+                self._app_secret,
+                self._base_url,
+            )
+
+            tou_data = await async_get_tou(
+                session, token, self._base_url, self._device_sn
+            )
+            items = tou_data.get("timeUseSettingItems", [])
+
+            while len(items) < self._program_num:
+                items.append(
+                    {
+                        "power": 15000,
+                        "voltage": 49,
+                        "time": "00:00",
+                        "enableGridCharge": False,
+                        "enableGeneration": False,
+                        "soc": 20,
+                    }
+                )
+
+            idx = self._program_num - 1
+            items[idx]["enableGridCharge"] = grid_charge
+            items[idx]["enableGeneration"] = gen_charge
+
+            await async_update_tou(
+                session, token, self._base_url, self._device_sn, items
+            )
+            self._is_on = gen_charge
             self.async_write_ha_state()
         except Exception as e:
             _LOGGER.error("Failed to set %s: %s", self.unique_id, e)

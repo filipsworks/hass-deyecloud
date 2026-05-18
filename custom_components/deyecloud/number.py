@@ -201,7 +201,7 @@ class DeyeTouNumber(NumberEntity):
                     {
                         "power": 15000,
                         "voltage": 49,
-                        "time": "0000",
+                        "time": "00:00",
                         "enableGridCharge": False,
                         "enableGeneration": False,
                         "soc": 20,
